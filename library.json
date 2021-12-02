@@ -1,0 +1,16 @@
+{
+  "name" : "HandySense",
+  "title": "HandySense firmware",
+  "keywords": "HandySense,Smart Farm,farm,handysense,NSTDA,Sense,Handy",
+  "description": "HandySense ระบบเกษตรแม่นยำ ฟาร์มอัจฉริยะ ผนวกเทคโนโลยีเซนเซอร์ตรวจวัดสภาพแวดล้อมทางการเกษตรและระบบควบคุมการทำงานอัตโนมัติ",
+  "git": "https://github.com/PrinceBot-Ratthanin/HandySense/",
+  "author": "NSTDA | Block by PrinceBot",
+  "email": "Print081@gmail.com",
+  "url": "https://github.com/PrinceBot-Ratthanin/HandySense/",
+  "version": "1.0.1",
+  "board" : "",
+  "platform": ["arduino-esp32"],
+  "license": "MIT",
+  "image" : "/static/handysense.png",
+  "homepage": "https://handysense.io/"
+}

@@ -1,0 +1,1 @@
+{"client":"96f631f9-dcb5-4751-8ea1-abfd6e6fc671","pass":"X1Sd3-xef__Q8puXBKcMBrkyzXrYGesY","user":"ZoUBv48RRUWu63FvRKb5Sh46u5P1CohE","ssid":"HONEYLab","password":"@HONEYLab","server":"mqtt.netpie.io","port":"1883"}1883"}

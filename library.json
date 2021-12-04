@@ -7,7 +7,7 @@
   "author": "NSTDA | Block by PrinceBot",
   "email": "Print081@gmail.com",
   "url": "https://github.com/PrinceBot-Ratthanin/HandySense/",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "board" : "",
   "platform": ["arduino-esp32"],
   "license": "MIT",

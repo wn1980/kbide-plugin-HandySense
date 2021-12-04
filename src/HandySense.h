@@ -27,96 +27,11 @@
 #endif
 
 int type_RTC = 1;
-// สร้างตัวแปรและใช้ Webserver สำหรับใช้ OTA
-const char* host = "esp32";
-WebServer server(80);
+int state_fristTime = 0;
 
-/*
-  Login page
-*/
-const char* loginIndex =
- "<form name='loginForm'>"
- "<table width='20%' bgcolor='A09F9F' align='center'>"
- "<tr>"
- "<td colspan=2>"
- "<center><font size=4><b>ESP32 Login Page</b></font></center>"
- "<br>"
- "</td>"
- "<br>"
- "<br>"
- "</tr>"
- "<td>Username:</td>"
- "<td><input type='text' size=25 name='userid'><br></td>"
- "</tr>"
- "<br>"
- "<br>"
- "<tr>"
- "<td>Password:</td>"
- "<td><input type='Password' size=25 name='pwd'><br></td>"
- "<br>"
- "<br>"
- "</tr>"
- "<tr>"
- "<td><input type='submit' onclick='check(this.form)' value='Login'></td>"
- "</tr>"
- "</table>"
- "</form>"
- "<script>"
- "function check(form)"
- "{"
- "if(form.userid.value=='admin' && form.pwd.value=='admin')"
- "{"
- "window.open('/serverIndex')"
- "}"
- "else"
- "{"
- " alert('Error Password or Username')/*displays error message*/"
- "}"
- "}"
- "</script>";
-
-/*
-  Server Index Page
-*/
-const char* serverIndex =
- "<script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
- "<form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
- "<input type='file' name='update'>"
- "<input type='submit' value='Update'>"
- "</form>"
- "<div id='prg'>progress: 0%</div>"
- "<script>"
- "$('form').submit(function(e){"
- "e.preventDefault();"
- "var form = $('#upload_form')[0];"
- "var data = new FormData(form);"
- " $.ajax({"
- "url: '/update',"
- "type: 'POST',"
- "data: data,"
- "contentType: false,"
- "processData:false,"
- "xhr: function() {"
- "var xhr = new window.XMLHttpRequest();"
- "xhr.upload.addEventListener('progress', function(evt) {"
- "if (evt.lengthComputable) {"
- "var per = evt.loaded / evt.total;"
- "$('#prg').html('progress: ' + Math.round(per*100) + '%');"
- "}"
- "}, false);"
- "return xhr;"
- "},"
- "success:function(d, s) {"
- "console.log('success!')"
- "},"
- "error: function (a, b, c) {"
- "}"
- "});"
- "});"
- "</script>";
 
 // ประกาศใช้ rtc_HandySense
- RTC_DS1307 rtc_HandySense;
+RTC_DS1307 rtc_HandySense;
 DateTime _now;
 int curentTimer;
 int dayofweek;
@@ -198,7 +113,7 @@ unsigned long previousTime_brightness         = 0;
 unsigned long previousTime_Update_data        = 0;
 unsigned long eventInterval_publishData = 60 * 1000;     // เช่น 2*60*1000 ส่งทุก 2 นาที
 
-float difference_soil                         = 20.00,    // ค่าความชื้นดินแตกต่างกัน +-20 % เมื่อไรส่งค่าขึ้น Web app ทันที
+float difference_soil                         = 30.00,    // ค่าความชื้นดินแตกต่างกัน +-20 % เมื่อไรส่งค่าขึ้น Web app ทันที
       difference_temp                         = 5.00;     // ค่าอุณหภูมิแตกต่างกัน +- 4 C เมื่อไรส่งค่าขึ้น Web app ทันที
 float soil_old  = 0.00,
       temp_old  = 0.00;
@@ -251,8 +166,8 @@ int t[20];
 /* new PCB Red */
 int relay_pin[4] = {0, 0, 0, 0};
 int RelayStatus[4];
-int ErrorSensor_pin[4] = {0,0,0,0};
-int ErrorSensor_Status[4] = {0,0,0,0};
+int ErrorSensor_pin[4] = {0, 0, 0, 0};
+int ErrorSensor_Status[4] = {0, 0, 0, 0};
 
 int status_sht31_error = 0;
 int status_light_error = 0;
@@ -319,79 +234,36 @@ int check_sendData_tempMinMax = 0;
 int tpye_lux = 0;
 int buff_count_LED_serverConnected;
 
-/* ----------------------- OTA Function => One on One --------------------------- */
-//void OTA_update() {
-//  DEBUG_PRINTLN("");
-//  DEBUG_PRINT("Connected to "); DEBUG_PRINTLN(ssid);
-//  DEBUG_PRINT("IP address: ");  DEBUG_PRINTLN(WiFi.localIP());
-//  if (!MDNS.begin(host)) {}
-//  DEBUG_PRINTLN("mDNS responder started");
-//  /*return index page which is stored in serverIndex */
-//  server.on("/", HTTP_GET, []() {
-//    server.sendHeader("Connection", "close");
-//    server.send(200, "text/html", loginIndex);
-//  });
-//  server.on("/serverIndex", HTTP_GET, []() {
-//    server.sendHeader("Connection", "close");
-//    server.send(200, "text/html", serverIndex);
-//  });
-//  /*handling uploading firmware file */
-//  server.on("/update", HTTP_POST, []() {
-//    server.sendHeader("Connection", "close");
-//    server.send(200, "text/plain", (Update.hasError()) ? "FAIL" : "OK");
-//    ESP.restart();
-//  }, []() {
-//    HTTPUpload& upload = server.upload();
-//    if (upload.status == UPLOAD_FILE_START) {
-//      Serial.printf("Update: %s\n", upload.filename.c_str());
-//      if (!Update.begin(UPDATE_SIZE_UNKNOWN)) { //start with max available size
-//        Update.printError(Serial);
-//      }
-//    } else if (upload.status == UPLOAD_FILE_WRITE) {
-//      /* flashing firmware to ESP*/
-//      if (Update.write(upload.buf, upload.currentSize) != upload.currentSize) {
-//        Update.printError(Serial);
-//      }
-//    } else if (upload.status == UPLOAD_FILE_END) {
-//      if (Update.end(true)) { //true to set the size to the current progress
-//        Serial.printf("Update Success: %u\nRebooting...\n", upload.totalSize);
-//      } else {
-//        Update.printError(Serial);
-//      }
-//    }
-//  });
-//  server.begin();
-//}
 
 // ---------------------------  Set pin Relay  --------------------------
-void setPin_Relay(int Relay1,int Relay2, int Relay3,int Relay4){
+void setPin_Relay(int Relay1, int Relay2, int Relay3, int Relay4) {
   relay_pin[0] = Relay1;
   relay_pin[1] = Relay2;
   relay_pin[2] = Relay3;
   relay_pin[3] = Relay4;
-  for(int i = 0;i<4;i++){
-    pinMode(relay_pin[i],OUTPUT);
-    digitalWrite(relay_pin[i],LOW);
+  for (int i = 0; i < 4; i++) {
+    pinMode(relay_pin[i], OUTPUT);
+    digitalWrite(relay_pin[i], LOW);
   }
 }
-void setPin_ErrorSensor(int Soil_Sensor,int Light_Sensor, int Temp_Sensor){
+void setPin_ErrorSensor(int Soil_Sensor, int Light_Sensor, int Temp_Sensor) {
   ErrorSensor_pin[0] = Soil_Sensor;
   ErrorSensor_pin[1] = Light_Sensor;
   ErrorSensor_pin[2] = Temp_Sensor;
-  for(int i = 0;i<3;i++){
-    pinMode(ErrorSensor_pin[i],OUTPUT);
+  for (int i = 0; i < 3; i++) {
+    pinMode(ErrorSensor_pin[i], OUTPUT);
   }
 }
 
-void read_RTC(int RTC_ch){
-  if(RTC_ch == 0){
+void read_RTC(int RTC_ch) {
+  if (RTC_ch == 0) {
     _now = rtc_HandySense.now();
     curentTimer = (_now.hour() * 60) + _now.minute();
     dayofweek = _now.dayOfTheWeek() - 1;
   }
   else {
-    curentTimer = (rtc_MCP7941x.getHour() * 60 )+ rtc_MCP7941x.getMinute();
-    dayofweek = rtc_MCP7941x.getDayofWeek() -1;
+    curentTimer = (rtc_MCP7941x.getHour() * 60 ) + rtc_MCP7941x.getMinute();
+    dayofweek = rtc_MCP7941x.getDayofWeek() - 1;
   }
 }
 /* ----------------------- Sent Timer --------------------------- */
@@ -536,7 +408,7 @@ void timmer_setting(String topic, byte * payload, unsigned int length) {
 
 /* ------------ Control Relay By Timmer ------------- */
 void ControlRelay_Bytimmer() {
-  
+
   if (WiFi.status() == WL_CONNECTED) {
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer, nistTime);
     if (getLocalTime(&timeinfo)) {
@@ -687,7 +559,7 @@ int Mode(float* getdata) {
 }
 
 /* ----------------------- Calculator sensor SHT31  --------------------------- */
-void Get_sht31(int Raw_Temp,int Raw_Hum) {
+void Get_sht31(int Raw_Temp, int Raw_Hum) {
   float buffer_temp = 0;
   float buffer_hum  = 0;
   float temp_cal    = 0;
@@ -758,7 +630,7 @@ void Get_sht31(int Raw_Temp,int Raw_Hum) {
     hum_error = 0;
     hum_error_count = 0;
   }
-  digitalWrite(ErrorSensor_pin[2],ErrorSensor_Status[2]);
+  digitalWrite(ErrorSensor_pin[2], ErrorSensor_Status[2]);
 }
 
 /* ----------------------- Calculator light sensor --------------------------- */
@@ -768,9 +640,9 @@ void Get_light_sensor(int Raw_Light) {
   int num_lux       = 0;
   /*if (tpye_lux == 2) {
     //buffer_lux = (myLux.getLux() * 2.15) / 1000;
-  } else {
+    } else {
     buffer_lux = (lightMeter.readLightLevel() * 2.15) / 1000; //(KLux)
-  }*/
+    }*/
   if (buffer_lux < 0 || buffer_lux > 188000 || isnan(buffer_lux)) { // range 0.045 to 188,000 lux
     if (lux_error_count >= 10) {
       lux_error = 1;
@@ -801,7 +673,7 @@ void Get_light_sensor(int Raw_Light) {
     lux_error = 0;
     lux_error_count = 0;
   }
-  digitalWrite(ErrorSensor_pin[1],ErrorSensor_Status[1]);
+  digitalWrite(ErrorSensor_pin[1], ErrorSensor_Status[1]);
 }
 
 /* ----------------------- Calculator sensor Soil  --------------------------- */
@@ -839,7 +711,7 @@ void Get_soil(int Raw_soil) {
     soil_error = 0;
     soil_error_count = 0;
   }
-  digitalWrite(ErrorSensor_pin[0],ErrorSensor_Status[0]);
+  digitalWrite(ErrorSensor_pin[0], ErrorSensor_Status[0]);
 }
 
 /* ------------- Get local Time -------------- */
@@ -869,10 +741,10 @@ void setAll_config() {
     if (Min_Temp[b] >= 255) {
       Min_Temp[b] = 0;
     }
-    DEBUG_PRINT("Max_Soil   ");  DEBUG_PRINT(b); DEBUG_PRINT(" : "); DEBUG_PRINTLN(Max_Soil[b]);
-    DEBUG_PRINT("Min_Soil   ");  DEBUG_PRINT(b); DEBUG_PRINT(" : "); DEBUG_PRINTLN(Min_Soil[b]);
-    DEBUG_PRINT("Max_Temp   ");  DEBUG_PRINT(b); DEBUG_PRINT(" : "); DEBUG_PRINTLN(Max_Temp[b]);
-    DEBUG_PRINT("Min_Temp   ");  DEBUG_PRINT(b); DEBUG_PRINT(" : "); DEBUG_PRINTLN(Min_Temp[b]);
+    // DEBUG_PRINT("Max_Soil   ");  DEBUG_PRINT(b); DEBUG_PRINT(" : "); DEBUG_PRINTLN(Max_Soil[b]);
+    // DEBUG_PRINT("Min_Soil   ");  DEBUG_PRINT(b); DEBUG_PRINT(" : "); DEBUG_PRINTLN(Min_Soil[b]);
+    // DEBUG_PRINT("Max_Temp   ");  DEBUG_PRINT(b); DEBUG_PRINT(" : "); DEBUG_PRINTLN(Max_Temp[b]);
+    // DEBUG_PRINT("Min_Temp   ");  DEBUG_PRINT(b); DEBUG_PRINT(" : "); DEBUG_PRINTLN(Min_Temp[b]);
   }
   int count_in = 0;
   for (int eeprom_relay = 0; eeprom_relay < 4; eeprom_relay++) {
@@ -888,9 +760,9 @@ void setAll_config() {
         if (time_close[eeprom_relay][dayinweek][eeprom_timer] >= 2000) {
           time_close[eeprom_relay][dayinweek][eeprom_timer] = 3000;
         }
-        DEBUG_PRINT("cout       : "); DEBUG_PRINTLN(count_in);
-        DEBUG_PRINT("time_open  : "); DEBUG_PRINTLN(time_open[eeprom_relay][dayinweek][eeprom_timer]);
-        DEBUG_PRINT("time_close : "); DEBUG_PRINTLN(time_close[eeprom_relay][dayinweek][eeprom_timer]);
+        // DEBUG_PRINT("cout       : "); DEBUG_PRINTLN(count_in);
+        // DEBUG_PRINT("time_open  : "); DEBUG_PRINTLN(time_open[eeprom_relay][dayinweek][eeprom_timer]);
+        // DEBUG_PRINT("time_close : "); DEBUG_PRINTLN(time_close[eeprom_relay][dayinweek][eeprom_timer]);
         count_in++;
       }
     }
@@ -960,8 +832,8 @@ void ControlRelay_BysoilMinMax(int Raw_soil) {
 }
 
 /* ----------------------- tempMinMax_ControlRelay --------------------------- */
-void ControlRelay_BytempMinMax(int Raw_Temp,int Raw_Hum) {
-  Get_sht31(Raw_Temp,Raw_Hum);
+void ControlRelay_BytempMinMax(int Raw_Temp, int Raw_Hum) {
+  Get_sht31(Raw_Temp, Raw_Hum);
   for (int g = 0; g < 4; g++) {
     if (Min_Temp[g] != 0 && Max_Temp[g] != 0) {
       if (temp_from_Sensor < Min_Temp[g]) {
@@ -1022,6 +894,7 @@ void Edit_device_wifi() {
   Serial.write(STX);
   serializeJsonPretty(jsonDoc, Serial);
   Serial.write(ETX);
+  delay(1000);
 
 }
 
@@ -1056,11 +929,11 @@ void webSerialJSON() {
 
 /* --------- อินเตอร์รัป แสดงสถานะการเชื่อม wifi ------------- */
 void IRAM_ATTR Blink_LED() {
-  if(connectWifiStatus == cannotConnect){
+  if (connectWifiStatus == cannotConnect) {
     digitalWrite(LED_WIFI, HIGH);
     digitalWrite(LED_SERVER, HIGH);
   }
-  else if(connectWifiStatus == wifiConnected){
+  else if (connectWifiStatus == wifiConnected) {
     digitalWrite(LED_WIFI, LOW);
 
   }
@@ -1071,9 +944,55 @@ void IRAM_ATTR Blink_LED() {
 void TaskWifiStatus(void * WifiStatus);
 void TaskWaitSerial(void * WaitSerial);
 
-float analog_to_percent(int RawAnalog){
+float analog_to_percent(int RawAnalog) {
   float voltageValue_soil_moisture = (RawAnalog * 3.3) / (4095.00);
   return ((-58.82) * voltageValue_soil_moisture) + 123.52;
+}
+void connectWIFI() {
+  connectWifiStatus = cannotConnect;
+  if (WiFi.status() != WL_CONNECTED) {
+    WiFi.begin(ssid.c_str(), password.c_str());
+    int count_ConnectWIFI = 0;
+    while (WiFi.status() != WL_CONNECTED) {
+      if (count_ConnectWIFI > 30) {
+      	DEBUG_PRINTLN("cannotConnect WIFI" );
+        break;
+      }
+      count_ConnectWIFI ++;
+      delay(100);
+    }
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+      connectWifiStatus = wifiConnected;
+      if (!client.connected()) {
+        client.setServer(mqtt_server.c_str(), mqtt_port.toInt());
+        client.setCallback(callback);
+        timeClient.begin();
+        client.connect(mqtt_Client.c_str(), mqtt_username.c_str(), mqtt_password.c_str());
+        delay(500);
+        client.subscribe("@private/#");
+        DEBUG_PRINTLN("Connecting to server");
+
+        
+
+        // set time to RTC
+        configTime(gmtOffset_sec, daylightOffset_sec, ntpServer, nistTime);
+        printLocalTime();
+        yearNow = timeinfo.tm_year + 1900;
+        monthNow = timeinfo.tm_mon + 1;
+        dayNow = timeinfo.tm_mday;
+        hourNow = timeinfo.tm_hour;
+        minuteNow = timeinfo.tm_min;
+        secondNow = timeinfo.tm_sec;
+        if (type_RTC == 0) {
+          rtc_HandySense.adjust(DateTime(yearNow, monthNow, dayNow, hourNow, minuteNow, secondNow));
+        }
+        else if (type_RTC == 1) {
+          rtc_MCP7941x.setDateTime(secondNow, minuteNow, hourNow, 5, dayNow, monthNow, 2000 - yearNow);
+        }
+
+      }
+    }
 }
 
 void setup_HandySense() {
@@ -1087,7 +1006,7 @@ void setup_HandySense() {
   Wire.begin();
   Wire.setClock(10000);
 
-  if(type_RTC ==0){
+  if (type_RTC == 0) {
     if (! rtc_HandySense.begin()) {
       Serial.println("Couldn't find rtc_HandySense");
       Serial.flush();
@@ -1098,23 +1017,10 @@ void setup_HandySense() {
       rtc_HandySense.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
   }
- 
-  
+
+
   pinMode(LED_WIFI, OUTPUT);
   pinMode(LED_SERVER, OUTPUT);
-  // pinMode(connect_WifiStatusToBox,    OUTPUT);
-  // pinMode(status_sht31_error,         OUTPUT);
-  // pinMode(status_light_error,      OUTPUT);
-  // pinMode(status_soil_error,          OUTPUT);
-  // digitalWrite(connect_WifiStatusToBox, HIGH);
-  // digitalWrite(status_sht31_error,      HIGH);
-  // digitalWrite(status_light_error,   HIGH);
-  // digitalWrite(status_soil_error,       HIGH);
-  // for (int x = 0; x < 20; x++) {
-  //   digitalWrite(LED_SERVER, 0);    digitalWrite(LED_WIFI, 1);    delay(50);
-  //   digitalWrite(LED_SERVER, 1);    digitalWrite(LED_WIFI, 0);    delay(50);
-  // }
-  // digitalWrite(LED_SERVER, HIGH);     digitalWrite(LED_WIFI, HIGH);
   Edit_device_wifi();
   EepromStream eeprom(0, 1024);
   deserializeJson(jsonDoc, eeprom);
@@ -1127,136 +1033,74 @@ void setup_HandySense() {
     mqtt_port     = jsonDoc["port"].as<String>();
     ssid          = jsonDoc["ssid"].as<String>();
   }
-
-  WiFi.begin(ssid.c_str(), password.c_str());
-  int count_ConnectWIFI = 0;
-    while (WiFi.status() != WL_CONNECTED) {
-       if(count_ConnectWIFI > 10){break;}
-      count_ConnectWIFI ++;
-      delay(100);
-    }
-  xTaskCreatePinnedToCore(TaskWifiStatus, "WifiStatus", 4096, NULL, 1, &WifiStatus, 1);
+  connectWIFI();
   xTaskCreatePinnedToCore(TaskWaitSerial, "WaitSerial", 8192, NULL, 2, &WaitSerial, 1);
   setAll_config();
   delay(500);
 
-  // sensorValue_soil_moisture = analogRead(Soil_moisture_sensorPin);
-  // voltageValue_soil_moisture = (sensorValue_soil_moisture * 3.3) / (4095.00);
-  // ma_soil[0] = ma_soil[1] = ma_soil[2] = ma_soil[3] = ma_soil[4] = ((-58.82) * voltageValue_soil_moisture) + 123.52;
-  // ma_temp[0] =  ma_temp[1] =  ma_temp[2] =  ma_temp[3] =  ma_temp[4] = sht31.readTemperature();
-  // ma_hum[0] = ma_hum[1] = ma_hum[2] = ma_hum[3] = ma_hum[4] = sht31.readHumidity();
-  // if (tpye_lux == 1) {
-  //   //ma_lux[0] = ma_lux[1] = ma_lux[2] = ma_lux[3] = ma_lux[4] = (myLux.getLux() * 2.15) / 1000;
-  // } else {
-  //   ma_lux[0] = ma_lux[1] = ma_lux[2] = ma_lux[3] = ma_lux[4] = (lightMeter.readLightLevel() * 2.15) / 1000;
-  // }
-
 }
 
-void loop_HandySense(float Soil_RawData,float brightness_RawData,float Temp_RawData,int Hum_RawData) {
+void loop_HandySense(float Soil_RawData, float brightness_RawData, float Temp_RawData, int Hum_RawData) {
 
-  client.loop();
-  server.handleClient();
-  delay(1);
+	connectWIFI();
+  if (client.connected()) {
+  	  connectWifiStatus = serverConnected;
+	  sendStatus_RelaytoWeb();
+	  send_soilMinMax();
+	  send_tempMinMax();
+	  client.loop();
+	  if(state_fristTime == 0){
+	  	UpdateData_To_Server();
+	  	state_fristTime = 1;
+	  }
+  }
+  
 
-  unsigned long currentTime = millis();
-  if (currentTime - previousTime_Temp_soil >= eventInterval) {
-    ControlRelay_Bytimmer();
-    ControlRelay_BysoilMinMax(Soil_RawData);
-    ControlRelay_BytempMinMax(Temp_RawData,Hum_RawData);
+  if (!isnan(Soil_RawData) && !isnan(brightness_RawData) && !isnan(Temp_RawData) && !isnan(Hum_RawData)) {
 
-    if(millis() > 90000){  // dylay 90 s to start check soil diff
-      if(abs((soil_from_Sensor-soil_old)/soil_from_Sensor * 100) > difference_soil){
-        DEBUG_PRINTLN("Soil diff");
+  	if(state_fristTime < 2){
+		soil_from_Sensor = Soil_RawData;
+		lux_from_Sensor = brightness_RawData;
+		temp_from_Sensor = Temp_RawData;
+		humidity_from_Sensor = Hum_RawData;
+		state_fristTime = 2;
+	}
+    unsigned long currenttime_HS = millis();
+    if (currenttime_HS - previousTime_Temp_soil >= eventInterval) {
+      ControlRelay_Bytimmer();
+      ControlRelay_BysoilMinMax(Soil_RawData);
+      ControlRelay_BytempMinMax(Temp_RawData, Hum_RawData);
+      Get_light_sensor(brightness_RawData);
+
+      if (millis() > 60000) { // dylay 0 s to start check soil diff
+        if (abs((Soil_RawData - soil_old) / Soil_RawData * 100) > difference_soil) {
+          DEBUG_PRINTLN("Soil diff");
+          UpdateData_To_Server();
+        }
+        if (abs((Temp_RawData - temp_from_Sensor)) > difference_temp ) {
+          DEBUG_PRINT("Temp Diff :: Old"); 
+          UpdateData_To_Server();
+        }
+      }
+      soil_old = soil_from_Sensor;
+      temp_old = temp_from_Sensor;
+
+      DEBUG_PRINTLN("");
+      DEBUG_PRINT("Temp : ");       DEBUG_PRINT(temp_from_Sensor);      DEBUG_PRINT(" C, ");
+      DEBUG_PRINT("Hum  : ");       DEBUG_PRINT(humidity_from_Sensor);  DEBUG_PRINT(" %RH, ");
+      DEBUG_PRINT("Brightness : "); DEBUG_PRINT(lux_from_Sensor); DEBUG_PRINT(" Klux, ");
+      DEBUG_PRINT("Soil  : ");      DEBUG_PRINT(soil_from_Sensor);      DEBUG_PRINTLN(" %");
+
+      previousTime_Temp_soil = currenttime_HS;
+    }
+
+    unsigned long currenttime_HS_Update_data = millis();
+    if (currenttime_HS_Update_data - previousTime_Update_data >= (eventInterval_publishData)) {
+      if (connectWifiStatus == serverConnected) {
         UpdateData_To_Server();
       }
-      if(abs((temp_from_Sensor-temp_old)/temp_from_Sensor *100) > difference_temp ){
-        DEBUG_PRINTLN("Temp Diff");
-        UpdateData_To_Server();
-      }
-    }
-    soil_old = soil_from_Sensor;
-    temp_old = temp_from_Sensor;
-     
-    DEBUG_PRINTLN("");
-    DEBUG_PRINT("Temp : ");       DEBUG_PRINT(temp_from_Sensor);      DEBUG_PRINT(" C, ");
-    DEBUG_PRINT("Hum  : ");       DEBUG_PRINT(humidity_from_Sensor);  DEBUG_PRINT(" %RH, ");
-    DEBUG_PRINT("Brightness : "); DEBUG_PRINT(lux_from_Sensor); DEBUG_PRINT(" Klux, ");
-    DEBUG_PRINT("Soil  : ");      DEBUG_PRINT(soil_from_Sensor);      DEBUG_PRINTLN(" %");
+      previousTime_Update_data = currenttime_HS_Update_data;
 
-    previousTime_Temp_soil = currentTime;
-  }
-  if (currentTime - previousTime_brightness >= eventInterval_brightness) {
-    Get_light_sensor(brightness_RawData);
-    previousTime_brightness = currentTime;
-  }
-  unsigned long currentTime_Update_data = millis();
-  if (currentTime_Update_data - previousTime_Update_data >= (eventInterval_publishData)) {
-    UpdateData_To_Server();
-    previousTime_Update_data = currentTime_Update_data;
-    
-  }
-
-}
-
-
-/* --------- Auto Connect Wifi and server and setup value init ------------- */
-void TaskWifiStatus(void * WifiStatus) {
-
-  while (1) {
-    connectWifiStatus = cannotConnect;
-    WiFi.begin(ssid.c_str(), password.c_str());
-    
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(100);
-    }
-
-    connectWifiStatus = wifiConnected;
-    client.setServer(mqtt_server.c_str(), mqtt_port.toInt());
-    client.setCallback(callback);
-    timeClient.begin();
-    client.connect(mqtt_Client.c_str(), mqtt_username.c_str(), mqtt_password.c_str());
-    delay(300);
-
-    while (!client.connected() ) {
-      client.connect(mqtt_Client.c_str(), mqtt_username.c_str(), mqtt_password.c_str());
-      DEBUG_PRINTLN("NETPIE2020 can not connect");
-      delay(100);
-    }
-
-    if (client.connect(mqtt_Client.c_str(), mqtt_username.c_str(), mqtt_password.c_str())) {
-      connectWifiStatus = serverConnected;
-
-      DEBUG_PRINTLN("NETPIE2020 connected");
-      client.subscribe("@private/#");
-
-      configTime(gmtOffset_sec, daylightOffset_sec, ntpServer, nistTime);
-      printLocalTime();
-      yearNow = timeinfo.tm_year + 1900;
-      monthNow = timeinfo.tm_mon + 1;
-      dayNow = timeinfo.tm_mday;
-      hourNow = timeinfo.tm_hour;
-      minuteNow = timeinfo.tm_min;
-      secondNow = timeinfo.tm_sec;
-      if(type_RTC == 0){rtc_HandySense.adjust(DateTime(yearNow, monthNow, dayNow, hourNow, minuteNow, secondNow));}
-      else if(type_RTC == 1){rtc_MCP7941x.setDateTime(secondNow, minuteNow, hourNow, 5, dayNow, monthNow, 2000-yearNow);}
-      
-
-//      OTA_update();
-    }
-    while (WiFi.status() == WL_CONNECTED) {
-
-      if (!client.connected()) {
-        client.connect(mqtt_Client.c_str(), mqtt_username.c_str(), mqtt_password.c_str());
-        DEBUG_PRINTLN("NETPIE2020 not connect Server");
-        delay(100);
-        client.connect(mqtt_Client.c_str(), mqtt_username.c_str(), mqtt_password.c_str());
-      }
-      else{
-        sendStatus_RelaytoWeb();
-        send_soilMinMax();
-        send_tempMinMax();
-      }
     }
   }
 }

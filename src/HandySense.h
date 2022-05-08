@@ -1072,7 +1072,7 @@ void loop_HandySense(float Soil_RawData, float brightness_RawData, float Temp_Ra
       ControlRelay_Bytimmer();
       ControlRelay_BysoilMinMax(Soil_RawData);
       ControlRelay_BytempMinMax(Temp_RawData, Hum_RawData);
-      Get_light_sensor(brightness_RawData);
+      //Get_light_sensor(brightness_RawData);
 
       if (millis() > 60000) { // dylay 0 s to start check soil diff
         if (abs((Soil_RawData - soil_old) / Soil_RawData * 100) > difference_soil) {

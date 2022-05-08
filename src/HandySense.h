@@ -1049,10 +1049,12 @@ void loop_HandySense(float Soil_RawData, float brightness_RawData, float Temp_Ra
 	  send_soilMinMax();
 	  send_tempMinMax();
 	  client.loop();
+    /*
 	  if(state_fristTime == 0){
 	  	UpdateData_To_Server();
 	  	state_fristTime = 1;
 	  }
+    */
   }
   
 
@@ -1098,6 +1100,8 @@ void loop_HandySense(float Soil_RawData, float brightness_RawData, float Temp_Ra
     if (currenttime_HS_Update_data - previousTime_Update_data >= (eventInterval_publishData)) {
       if (connectWifiStatus == serverConnected) {
         UpdateData_To_Server();
+        esp_sleep_enable_timer_wakeup(15 * 60 * 1000000);
+        esp_deep_sleep_start();
       }
       previousTime_Update_data = currenttime_HS_Update_data;
 
